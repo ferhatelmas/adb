@@ -1,0 +1,31 @@
+[copy paste from email. 
+
+---
+ only local machine supported
+
+to experiment yourself: first run join_everything.sql and then run generate_cube.sql to build the datacube (or generate sql from generate_cube.py changing parameters)] and then 
+---
+
+It seems we agreed that I will do this. So it seems we've done a bit overlapping work, not too good, right?! 
+But it's good I at least didn't start implementing nasty Java code (I've just commited a tiny script for cube sql generator in python allowing to easily evaluate different parameters [=columns and zoom-levels materialized]).
+
+According to my experinments (with s=0.1) on local machine [no distribution], we cannot not materialize the whole datacube, as it would be bigger than the initial database (437MB+4MB subset without product_id, even if no part_name was stored, but only part_id 267MB+4MB -- and not materializing part_name may be quite slow if very many of them were to be retrieved). 
+
+So sort of feasible solution would be to materialize all dimensions except product with higher time precision [no months, and no days]. This still takes 130% of initial DB if storing part name as string (or 88% otherwise). The not materialized datacube part we may just implement as a VIEW, so it could be accessed in the consistent way.
+
+Best choices on dimensions so far:
+
+* time: all, year, *year_month, *date #  ! year_month and date not materialized for product_id
+* location: all, region, nation # only by customer for now, and probably that's enough, the datacube is already sufficiently big
+* product: all, product_id*
+
+some materialized columns: region_id, nation_id, product_id 
+some not materialized columns: product_name (i.e. =part_name), region_name, nation_name (to be joined during OLAP). product_name could be also... depending on number of tuples to be retrieved (e.g. if we are interested only in sorting and getting top hundreds/thousands... then bloomjoin would do quite wonderful job!).
+
+data values: volume, with avg + sum
+
+on top of that we may wish to be able to choose ordering either by dimensions [e.g. time], or by avg/sum of volume.
+
+
+I've commited a python script for generating SQL to create datacube locally [once we have the right subset of full join of tables [sort of result of join_everything.sql], the second part of datacube generation code shall work exactly the same as the local one]. 
+On local machine with s=0.1 the cube creation takes ~300s  [will be similar in distributed, but will scale] + if I remember well ~200s to materialize the full-join. 

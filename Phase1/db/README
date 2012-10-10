@@ -1,0 +1,12 @@
+-- creates database
+$> mysql -u username -p < create_database.sql
+
+1- creates database
+2- creates tables
+3- loads tables
+4- makes constraints (this is done after data is loaded to speed up loading)
+5- renames tables to use q7 as it is
+
+q7_our_output: the result of our engine
+q7_output    : the result of mysql
+parameters   : s=0.01, n1.name=GERMANY and n2.name=FRANCE

@@ -1,0 +1,13 @@
+============
+Installation
+============
+
+To distribute the data on servers, cd to populate_db and run populate.sh
+
+cd populate_db
+./populate.sh <Scale-Factor>
+
+This would generate the database and distribute it on different nodes. The next step is to run the queries. 
+
+To run Q7: java -jar dpch-team.jar Q7 FRANCE GERMANY
+To run Q8: java -jar dpch-team.jar Q8 BRAZIL AMERICA "ECONOMY ANODIZED STEEL"

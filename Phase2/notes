@@ -1,0 +1,87 @@
+good things:
+    simple distribution
+    simple processing
+    
+bad things:
+    bad scalability!
+    
+    relations stored on M0 may be bottleneck in distributed bloom-join processing (one machine need to process N partial joins to serve all other machines)
+    relation Part being quote large may be really impacted by this. Supplier also for very large scale ratios..
+
+another possibility:
+    distribute Part and maybe Supplier by their ID (e.g. id % n_machines or smf like that)
+    
+    consequences: each machine would have to contact every other to process the distributed bloom-join (N^2 connections in total). 
+    
+    Better scalability as every machine would participate
+
+
+Distributed by customer_id on every machine:
+    LineItem (order_id -> Order.customer_id)            s * 6M
+    Order (customer_id) --> distinct 7 for scale=0.1    s * 1.5M
+    Customer                                            s * 150K
+     
+Relations stored on one machine (M0):
+                tuples
+    Nation      25
+    
+    (Attention: shall these two be distributed however??!!)
+    Supplier    s * 10K         
+    Part (Q8)   s * 200K --> ~1.4K expected after selection p_type (cardinality of 150), but could be more if data skewed
+
+
+
+
+
+Notice:
+- We can compute partial SUM() for aggregates, so extremely minimizing the amounts of data transfered.
+- the bloomjoin is useful for scalability (in addition to other selection filters, as we distribute data, so just a subset of locally available tuples  need to fetched)
+
+
+
+(Simplified) Query plans:
+Q7.
+
+    select (sup_nation, cust_nation, sum[l_volume]) {
+        select (n1.name as sup_nation,                 n2.name as cust_nation, l_year, l_volume) {
+            [SQL2: filter(Nation N1) |><| Supplier ] <bloom-join> [SQL1: LineItem |><| Order |><| Customer |><| filter(Nation N2) ]
+        }
+    }
+    
+    ! Execution flow: on each of distributed machines: calculate SQL1, then bloom-join with remote SQL2 downloading the resulting tuples
+        (download N1 and Supplier separately and run join again, and then join with SQL1)
+        calculate partial sums and them to the machine which will sum it up [eg same storing Nation/Supplier etc]       
+    
+
+Q8. 
+
+
+
+    select (o_year, SUM(volume if nation=?) ){
+        
+        select ( o_year, l_volume, n2.n_name as nation) {
+            1/150                                                          2y: <1/20  (1/3)                                               1/5
+            [SQL2: filter_p_type(Part) ] <bloom-join> [SQL1: LineItem |><| filter_date(Order) |><| Customer |><| Nation N1 |><| filter_r_name (Region) ]
+                                   
+                <bloom-join on l_supplier> [SQL3: Nation N2 |><| Supplier ]
+       }
+
+    ! Execution flow: 
+    
+    know we have a couple of options:
+    
+   a)  evaluate SQL1 localy [size is limited by LineItem] -- even better as SQL1 size limited by local relation size
+          do bloom-join with filter_p_type(Part): send SQL1 bit_vector to M0, the result will filter out some (many) tuples
+          obtain SQL1 |><| SQL2
+       
+               
+   b)     on evey machine:
+            with  [SQL1 |><| SQL2] compute bloom-vector for SQL3 and send to M0
+                        on M0: process bloom-joins and return the required tuples (not joined)
+                            --- here we get a problem: M0 may become a bottleneck then processing bloom-join requests 
+                            from all other machines on large Part relation (network & computation)
+        on every machine:    
+                join SQL3 with  SQL1 |><| SQL2
+                calculate partial sums
+
+    

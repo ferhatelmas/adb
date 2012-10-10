@@ -1,0 +1,17 @@
+cd ~/src
+
+rm -Rf buildcube_classes
+mkdir buildcube_classes
+javac -classpath "../../lib/mysql-connector-java-5.1.19-bin.jar:." -d buildcube_classes */*/*.java */*.java  Main.java
+jar -cvf buildcube.jar -C buildcube_classes/ .
+scp ./buildcube.jar team7@icdatasrv1:/export/home/team7/
+
+
+TO Run:
+
+#locally
+
+java -cp "../../lib/mysql-connector-java-5.1.19-bin.jar:./buildcube.jar" Main
+
+#on epfl server (scp will put jar automatically)
+java -cp "lib/mysql-connector-java-5.1.19-bin.jar:./buildcube.jar" Main

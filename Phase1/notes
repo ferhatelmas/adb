@@ -1,0 +1,35 @@
+HDFS:
+Display options: hadoop dfs
+Example: hadoop dfs -ls /team8
+Documenation: http://hadoop.apache.org/common/docs/r0.20.0/hdfs_shell.html
+
+Generating datasets:
+./dbgen -s 0.1
+
+
+Status: check
+http://icdatasrv3:50070/   (namenode)
+http://icdatasrv4:50030/   (job tracker)
+
+
+cd ~/src
+mkdir db7_classes
+
+== put input
+hadoop dfs -mkdir /team8/input20
+hadoop dfs -put ~/factor20/* /team8/input20/
+
+hadoop dfs -rmr /team8/input/*
+hadoop dfs -put ~/factor10/* /team8/input/
+
+=== To compile and run (you can copy past everything) ===
+cd ~/src
+javac -classpath /opt/hadoop_install/hadoop/hadoop-0.20.2-core.jar -d db7_classes relations/*.java operators/*/*.java operators/*/*/*.java dbq7.java
+jar -cvf dbq7.jar -C db7_classes/ .
+hadoop dfs -rmr /team8/temp/
+hadoop jar dbq7.jar dbq7 /team8/input20/
+
+=== See results
+hadoop dfs -ls /team8/temp/
+hadoop dfs -ls /team8/temp/ImdJoinResult/
+hadoop dfs -tail /team8/temp/ImdJoinResult/part-00000

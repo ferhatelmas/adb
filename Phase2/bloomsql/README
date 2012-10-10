@@ -1,0 +1,87 @@
+just paste constents of sql.sql into mysql shell:
+
+mysql> INSERT INTO hashes SELECT DISTINCT ((ROWID*107+1009) MOD @hashlen) AS hash, 1 AS active FROM lineitem limit 100000 ;
+Query OK, 99881 rows affected (0.82 sec)
+Records: 99881  Duplicates: 0  Warnings: 0
+
+mysql> 
+mysql> 
+mysql> -- version 2: takes 3s on sf=0.1 0.2s
+mysql> select LENGTH(compress(bit_vector)), LENGTH(bit_vector) FROM (
+    -> SELECT group_concat(active order by hash asc SEPARATOR '') as bit_vector FROM (
+    ->         -- get list of hash states
+    ->         select MAX(active) AS active, hash FROM   (
+    ->                      select hash, active from hashes
+    ->                      Union 
+    ->                      select number as hash, 0 as active from all_hash_numbers where number < @hashlen
+    ->         ) as hashitems
+    ->         group by hash
+    -> ) as b
+    -> ) as c;
++------------------------------+--------------------+
+| LENGTH(compress(bit_vector)) | LENGTH(bit_vector) |
++------------------------------+--------------------+
+|                          125 |              99881 |
++------------------------------+--------------------+
+1 row in set (0.76 sec)
+
+mysql> 
+mysql> 
+mysql> -- version 1: takes 12s on sf=0.1 with hashlen := 31567
+mysql> 
+mysql> select LENGTH(COMPRESS(@bf)), @cn from (
+    -> SELECT @cn:=@cn+1 AS cnt,        
+    ->     @bf:=INSERT(@bf, hash+1, 1, '1') AS bf FROM hashes AS t 
+    -> ORDER BY cnt DESC LIMIT 1) as t1;
+^CCtrl-C -- sending "KILL QUERY 358" to server ...
+Ctrl-C -- query aborted.
+
+ERROR 1317 (70100): Query execution was interrupted
+mysql> 
+
+------------------ smaller dataset ---------
+
+
+
+mysql> INSERT INTO hashes SELECT DISTINCT ((ROWID*107+1009) MOD @hashlen) AS hash, 1 AS active FROM lineitem limit 100000 ;
+Query OK, 31567 rows affected (0.70 sec)
+Records: 31567  Duplicates: 0  Warnings: 0
+
+mysql> 
+mysql> 
+mysql> -- version 2: takes 3s on sf=0.1 0.2s; with hashlen 99881 0.76 s
+mysql> select LENGTH(compress(bit_vector)), LENGTH(bit_vector) FROM (
+    -> SELECT group_concat(active order by hash asc SEPARATOR '') as bit_vector FROM (
+    ->         -- get list of hash states
+    ->         select MAX(active) AS active, hash FROM   (
+    ->                      select hash, active from hashes
+    ->                      Union 
+    ->                      select number as hash, 0 as active from all_hash_numbers where number < @hashlen
+    ->         ) as hashitems
+    ->         group by hash
+    -> ) as b
+    -> ) as c;
++------------------------------+--------------------+
+| LENGTH(compress(bit_vector)) | LENGTH(bit_vector) |
++------------------------------+--------------------+
+|                           59 |              31567 |
++------------------------------+--------------------+
+1 row in set (0.23 sec)
+
+mysql> 
+mysql> 
+mysql> -- version 1: takes 12s on sf=0.1 with hashlen := 31567; with 99881 very slow and resource consuming!!
+mysql> 
+mysql> select LENGTH(COMPRESS(@bf)), @cn from (
+    -> SELECT @cn:=@cn+1 AS cnt,        
+    ->     @bf:=INSERT(@bf, hash+1, 1, '1') AS bf FROM hashes AS t 
+    -> ORDER BY cnt DESC LIMIT 1) as t1;
++-----------------------+-------+
+| LENGTH(COMPRESS(@bf)) | @cn   |
++-----------------------+-------+
+|                    59 | 31567 |
++-----------------------+-------+
+1 row in set (11.66 sec)
+
+mysql> 
+
